@@ -1,0 +1,4 @@
+0 Leer
+1 Wenig
+2 Mittel
+3 Voll
