@@ -5,16 +5,19 @@ import streamlit as st
 import tensorflow as tf
 from PIL import Image
 
+
 st.set_page_config(
     page_title="Bolzplatzradar",
     page_icon="⚽",
     layout="wide",
 )
 
+# Alle Dateien liegen direkt neben app.py im Hauptverzeichnis.
 BASE_DIR = Path(__file__).parent
 MODEL_PATH = BASE_DIR / "keras_model.h5"
 LABELS_PATH = BASE_DIR / "labels.txt"
 IMAGE_SIZE = 224  # Muss zur Eingabegröße deines Modells passen.
+
 
 # Beispielplätze: später durch echte Daten aus einer Datenbank/API ersetzen.
 PLACES = [
@@ -64,7 +67,7 @@ PLACES = [
 
 
 def load_labels():
-    """Lädt die Klassen in der Reihenfolge aus labels.txt."""
+    """Lädt die Klassen aus labels.txt, eine Klasse pro Zeile."""
     if not LABELS_PATH.exists():
         return ["Leer", "Wenig", "Mittel", "Voll"]
 
@@ -76,9 +79,12 @@ def load_labels():
 
 @st.cache_resource
 def load_model():
-    """Lädt das fest im Projekt hinterlegte Keras-Modell."""
+    """Lädt das Keras-Modell aus dem Hauptverzeichnis."""
     if not MODEL_PATH.exists():
-        raise FileNotFoundError(f"Modell nicht gefunden: {MODEL_PATH}")
+        raise FileNotFoundError(
+            f"Modell nicht gefunden: {MODEL_PATH}. "
+            "Lege keras_model.h5 neben app.py ab."
+        )
 
     return tf.keras.models.load_model(MODEL_PATH, compile=False)
 
@@ -87,8 +93,8 @@ def predict_occupancy(image, model, labels):
     """
     Klassifiziert ein Foto.
 
-    Passe Größe und Normalisierung an, falls dein Modell beim Training
-    eine andere Bildvorverarbeitung verwendet hat.
+    Größe und Normalisierung müssen zur Vorverarbeitung passen,
+    die beim Training des Modells verwendet wurde.
     """
     image = image.convert("RGB").resize((IMAGE_SIZE, IMAGE_SIZE))
     image_array = np.asarray(image, dtype=np.float32) / 255.0
@@ -130,7 +136,7 @@ def occupancy_color(label):
     }.get(label, "#667085")
 
 
-# Modell beim Start laden. Es gibt keinen Modell-Upload in der Benutzeroberfläche.
+# Modell beim Start laden.
 try:
     model = load_model()
     model_error = None
@@ -160,7 +166,7 @@ st.write("")
 if model is None:
     st.warning(
         "Das KI-Modell ist gerade nicht verfügbar. "
-        "Prüfe, ob models/bolzplatz_model.h5 im Projekt liegt."
+        "Prüfe, ob keras_model.h5 im Projekt-Hauptverzeichnis liegt."
     )
     with st.expander("Technische Information"):
         st.code(model_error or "Unbekannter Fehler")
@@ -220,7 +226,9 @@ with st.expander("📷 Foto eines Bolzplatzes hochladen"):
                     except Exception as exc:
                         st.error(f"Die Vorhersage ist fehlgeschlagen: {exc}")
             else:
-                st.info("Die Schätzung ist nicht verfügbar, solange das Modell fehlt.")
+                st.info(
+                    "Die Schätzung ist nicht verfügbar, solange das Modell fehlt."
+                )
 
         except Exception as exc:
             st.error(f"Das Foto konnte nicht geöffnet werden: {exc}")
@@ -251,10 +259,15 @@ for place in PLACES:
         continue
 
     query = search.strip().lower()
-    if query and query not in place["name"].lower() and query not in place["area"].lower():
+    if (
+        query
+        and query not in place["name"].lower()
+        and query not in place["area"].lower()
+    ):
         continue
 
     filtered_places.append(place)
+
 
 if sort_option == "Am wenigsten besucht":
     filtered_places.sort(key=lambda place: place["players"])
@@ -262,6 +275,7 @@ elif sort_option == "Am meisten besucht":
     filtered_places.sort(key=lambda place: place["players"], reverse=True)
 elif sort_option == "Entfernung":
     filtered_places.sort(key=lambda place: place["distance"])
+
 
 if not filtered_places:
     st.info("Keine Plätze gefunden. Ändere deine Suche oder Filter.")
